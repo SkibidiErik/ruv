@@ -1,0 +1,36 @@
+# Sensible Daten / Secrets
+.env
+.env.*
+*.env
+config.local.*
+secrets.*
+credentials.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtuelle Umgebung
+venv/
+.venv/
+env/
+.env/
+
+# Datenbanken
+*.db
+*.sqlite3
+
+# IDE / Editor
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
