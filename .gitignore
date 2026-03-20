@@ -1,4 +1,5 @@
 # Sensible Daten / Secrets
+smartfix_config.py
 .env
 .env.*
 *.env
