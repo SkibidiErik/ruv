@@ -36,6 +36,13 @@ CATEGORY_BY_SUBSYSTEM = {
 
 PRIORITY_OPTIONS = [str(i) for i in range(1, 10)]
 
+# Mapping: SubSystem-Name -> tatsächlicher Exchange-Ordnername
+SUBSYSTEM_FOLDER = {
+    "RuV_Ersterkennung": "RuV_Ersterkennung",
+    "RuV_Ersterkennung_Dev": "RuV_Ersterkennung_Review",
+    "RuV_Luxemburg": "RuV_Luxemburg",
+}
+
 
 def center(win, w=1180, h=880):
     win.update_idletasks()
@@ -464,7 +471,9 @@ class SmartFixController(tb.Window):
         stack_id = f"{stack_guid}_{safe_stem}"
 
         # Zielordner unter dem jeweiligen Mandanten-Ordner ablegen
-        dest_dir = Path(EXCHANGE_BASE) / subsystem / stack_id
+        # (Dev landet in Review-Ordner)
+        exchange_folder = SUBSYSTEM_FOLDER.get(subsystem, subsystem)
+        dest_dir = Path(EXCHANGE_BASE) / exchange_folder / stack_id
         doc_dir = dest_dir / "Dokument00001"
 
         try:
