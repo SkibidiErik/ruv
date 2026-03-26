@@ -51,14 +51,23 @@ def build_import_xml(
     dpi: str,
     export_verifier_documents: str,
     export_supervisor_documents: str,
+    extra_attributes: list[tuple[str, str]] | None = None,
 ) -> str:
-    return f'''<STACK Category="{category}" LocationType="FILE" StackID="{stack_id}" SubSystem="{SUBSYSTEM}" Priority="{priority}" ExportVerifierDocuments="{export_verifier_documents}" ExportSupervisorDocuments="{export_supervisor_documents}">
-\t<ATTRIBUTES>
-\t\t<KeyValuePair Key="$Dpi" Value="{dpi}"/>
-\t</ATTRIBUTES>
-\t<IMAGE ImageID="image0" LocationID="Dokument00001/{pdf_name}:0" DocID="Dokument00001" ProcessID=""/>
-</STACK>
-'''
+    attr_lines = f'\t\t<KeyValuePair Key="$Dpi" Value="{dpi}"/>\n'
+    for key, value in (extra_attributes or []):
+        attr_lines += f'\t\t<KeyValuePair Key="{key}" Value="{value}"/>\n'
+    return (
+        f'<STACK Category="{category}" LocationType="FILE" StackID="{stack_id}"'
+        f' SubSystem="{SUBSYSTEM}" Priority="{priority}"'
+        f' ExportVerifierDocuments="{export_verifier_documents}"'
+        f' ExportSupervisorDocuments="{export_supervisor_documents}">\n'
+        f'\t<ATTRIBUTES>\n'
+        f'{attr_lines}'
+        f'\t</ATTRIBUTES>\n'
+        f'\t<IMAGE ImageID="image0" LocationID="Dokument00001/{pdf_name}:0"'
+        f' DocID="Dokument00001" ProcessID=""/>\n'
+        f'</STACK>\n'
+    )
 
 
 def wait_for_export_xml(stack_dir: Path, timeout_seconds: int = 60, poll_seconds: float = 1.0) -> Path | None:
@@ -125,6 +134,7 @@ class SmartFixController(tb.Window):
         self.result_stackid_var = tk.StringVar(value="-")
         self.last_created_folder = None
         self.last_stack_id = None
+        self._attr_rows: list[tuple[tk.StringVar, tk.StringVar, tb.Frame]] = []
         self._build_ui()
 
     def _build_ui(self):
@@ -215,6 +225,22 @@ class SmartFixController(tb.Window):
             variable=self.export_supervisor_var,
             bootstyle="round-toggle"
         ).grid(row=2, column=2, columnspan=2, sticky=W, pady=(12, 0))
+
+        attr_card = tb.Labelframe(left, text="Zusätzliche Attribute (optional)", padding=16, bootstyle="secondary")
+        attr_card.pack(fill=X, pady=(12, 0))
+        attr_card.columnconfigure(0, weight=1)
+
+        self._attr_list_frame = tb.Frame(attr_card)
+        self._attr_list_frame.pack(fill=X)
+        self._attr_list_frame.columnconfigure(1, weight=1)
+        self._attr_list_frame.columnconfigure(3, weight=1)
+
+        tb.Button(
+            attr_card,
+            text="+ Attribut hinzufügen",
+            bootstyle="secondary-outline",
+            command=self._add_attr_row
+        ).pack(anchor=W, pady=(8, 0))
 
         action_card = tb.Labelframe(left, text="Aktionen", padding=16, bootstyle="secondary")
         action_card.pack(fill=X, pady=(12, 0))
@@ -333,6 +359,39 @@ class SmartFixController(tb.Window):
             justify="left"
         ).grid(row=row, column=1, sticky=W, pady=4, padx=(10, 0))
 
+    def _add_attr_row(self):
+        row_idx = len(self._attr_rows)
+        frame = tb.Frame(self._attr_list_frame)
+        frame.grid(row=row_idx, column=0, columnspan=5, sticky=EW, pady=2)
+        frame.columnconfigure(1, weight=1)
+        frame.columnconfigure(3, weight=1)
+
+        key_var = tk.StringVar()
+        val_var = tk.StringVar()
+
+        tb.Label(frame, text="Key", font=("Segoe UI", 9)).grid(row=0, column=0, sticky=W, padx=(0, 4))
+        tb.Entry(frame, textvariable=key_var).grid(row=0, column=1, sticky=EW, padx=(0, 8))
+        tb.Label(frame, text="Value", font=("Segoe UI", 9)).grid(row=0, column=2, sticky=W, padx=(0, 4))
+        tb.Entry(frame, textvariable=val_var).grid(row=0, column=3, sticky=EW, padx=(0, 8))
+
+        entry = (key_var, val_var, frame)
+        self._attr_rows.append(entry)
+
+        tb.Button(
+            frame,
+            text="✕",
+            bootstyle="danger-outline",
+            width=3,
+            command=lambda e=entry: self._remove_attr_row(e)
+        ).grid(row=0, column=4, sticky=W)
+
+    def _remove_attr_row(self, entry):
+        key_var, val_var, frame = entry
+        self._attr_rows.remove(entry)
+        frame.destroy()
+        for idx, (kv, vv, fr) in enumerate(self._attr_rows):
+            fr.grid(row=idx, column=0, columnspan=5, sticky=EW, pady=2)
+
     def set_status(self, text: str, style: str = "secondary"):
         self.status.set(text)
         self.status_label.configure(bootstyle=style)
@@ -438,6 +497,12 @@ class SmartFixController(tb.Window):
             messagebox.showerror("Fehler", f"Konnte PDF nicht kopieren:\n{e}")
             return
 
+        extra_attributes = [
+            (kv.get().strip(), vv.get().strip())
+            for kv, vv, _ in self._attr_rows
+            if kv.get().strip() and vv.get().strip()
+        ]
+
         import_xml = build_import_xml(
             stack_id=stack_id,
             pdf_name=pdf_name,
@@ -446,6 +511,7 @@ class SmartFixController(tb.Window):
             dpi=dpi,
             export_verifier_documents=export_verifier_documents,
             export_supervisor_documents=export_supervisor_documents,
+            extra_attributes=extra_attributes,
         )
         import_path = dest_dir / "import.xml"
         try:
